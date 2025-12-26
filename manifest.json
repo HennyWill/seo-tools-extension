@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SEO Tools",
   "version": "1.0.0",
-  "description": "Modern SEO toolkit for quick access to analysis tools and popular SEO services. Features indexability checking, schema validation, link analysis, and integrations with Google Search Console, Ahrefs, and Archive.org.",
+  "description": "Modern SEO toolkit with indexability check, schema validation, link analysis. Integrates Google Search Console, Ahrefs, Archive.org.",
   "author": "HennyWill",
   "permissions": ["activeTab", "scripting"],
   "action": {
