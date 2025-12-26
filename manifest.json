@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "SEO Tools",
+  "version": "1.0.0",
+  "description": "Modern SEO toolkit for quick access to analysis tools and popular SEO services. Features indexability checking, schema validation, link analysis, and integrations with Google Search Console, Ahrefs, and Archive.org.",
+  "author": "HennyWill",
+  "permissions": ["activeTab", "scripting"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SEO Tools - Quick Analysis",
+    "default_icon": {
+      "16": "16.png",
+      "48": "48.png",
+      "128": "128.png"
+    }
+  },
+  "icons": {
+    "16": "16.png",
+    "48": "48.png",
+    "128": "128.png"
+  }
+}
