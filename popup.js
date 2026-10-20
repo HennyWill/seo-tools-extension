@@ -1,5 +1,7 @@
-import { buildRichResultsUrl } from './popup/utils/url.js';
+import { buildRichResultsUrl, buildSearchConsoleUrl, getSearchConsoleResources } from './popup/utils/url.js';
 import { showToast, showLoading, hideLoading } from './popup/utils/ui.js';
+
+import { renderLinkAnalysis, renderStructuredData } from './popup/reports.js';
 
 let lastSummaryData = null;
 
@@ -29,6 +31,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const checkIndexabilityButton = document.getElementById("checkIndexabilityButton");
   const checkSchemaButton = document.getElementById("checkSchemaButton");
   const metaTagsButton = document.getElementById("metaTagsButton");
+  const richResultsButton = document.getElementById("richResultsButton");
+  const analyzeLinksButton = document.getElementById("analyzeLinksButton");
   const themeToggle = document.getElementById("themeToggle");
 
   // Theme toggle
@@ -49,6 +53,25 @@ document.addEventListener("DOMContentLoaded", () => {
       applyTheme('light');
     }
   }
+
+  const resourceSelect = document.getElementById('gscResource');
+  getActiveTab().then(tab => {
+    if (!tab || isRestrictedUrl(tab.url)) return;
+    const hostname = new URL(tab.url).hostname;
+    const saved = localStorage.getItem('gsc:' + hostname) || '';
+    const choices = getSearchConsoleResources(tab.url, saved);
+    resourceSelect.replaceChildren();
+    for (const choice of choices) {
+      const option = document.createElement('option');
+      option.value = choice.value;
+      option.textContent = choice.label;
+      resourceSelect.appendChild(option);
+    }
+    resourceSelect.value = choices.some(choice => choice.value === saved) ? saved : choices[0].value;
+    resourceSelect.addEventListener('change', () => {
+      localStorage.setItem('gsc:' + hostname, resourceSelect.value);
+    });
+  }).catch(console.error);
 
   // Auto-load summary
   loadSummary();
@@ -90,13 +113,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const tab = await getActiveTab();
         if (!tab) return;
         if (isRestrictedUrl(tab.url)) { showToast('This tool doesn\'t work on browser system pages', 'warning'); return; }
-        const url = new URL(tab.url);
-        const domain = encodeURIComponent(url.protocol + '//' + url.hostname + '/');
-        const pageUrl = encodeURIComponent(tab.url);
-        const searchConsoleUrl = `https://search.google.com/search-console/performance/search-analytics?resource_id=${domain}&breakdown=page&page=!${pageUrl}`;
+        const searchConsoleUrl = buildSearchConsoleUrl(tab.url, resourceSelect.value);
         await chrome.tabs.create({ url: searchConsoleUrl });
       } catch (error) {
-        showToast('Error opening Search Console', 'error');
+        showToast('Check the selected Search Console resource and try again', 'error');
         console.error('Console error:', error);
       }
     });
@@ -228,7 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (links) {
           await copyToClipboard(links);
-          const count = links.split('\n').filter(l => l).length;
+          const count = links.split('\n').filter(l => l && !l.startsWith('---')).length;
           showToast(`${count} links copied to clipboard!`, 'success');
         } else {
           showToast('No links found on this page', 'warning');
@@ -266,6 +286,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (checkIndexabilityButton) {
     checkIndexabilityButton.addEventListener("click", async () => {
+      showLoading(checkIndexabilityButton);
       try {
         const tab = await getActiveTab();
         if (!tab) return;
@@ -279,25 +300,46 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (error) {
         showToast('Error checking indexability', 'error');
         console.error('Check indexability error:', error);
+      } finally {
+        hideLoading(checkIndexabilityButton);
       }
     });
   }
 
-  if (checkSchemaButton) {
-    checkSchemaButton.addEventListener("click", async () => {
+  if (richResultsButton) {
+    richResultsButton.addEventListener('click', async () => {
       try {
         const tab = await getActiveTab();
         if (!tab) return;
-        if (isRestrictedUrl(tab.url)) { showToast('This tool doesn\'t work on browser system pages', 'warning'); return; }
-        const currentUrl = tab.url;
-        const testUrl = buildRichResultsUrl(currentUrl);
-        await chrome.tabs.create({ url: testUrl });
+        if (isRestrictedUrl(tab.url)) { showToast('Not available on this page', 'warning'); return; }
+        await chrome.tabs.create({ url: buildRichResultsUrl(tab.url) });
       } catch (error) {
-        showToast('Error opening Schema tester', 'error');
-        console.error('Check schema error:', error);
+        console.error('Rich Results Test error:', error);
+        showToast('Could not open Rich Results Test', 'error');
       }
     });
   }
+
+  bindReportTool(checkSchemaButton, 'scripts/getStructuredData.js', (data, container) => {
+    renderStructuredData(data, container, {
+      copy: copyToClipboard,
+      notify: showToast,
+      validate: async () => {
+        try { await chrome.tabs.create({ url: buildRichResultsUrl(data.pageUrl) }); }
+        catch { showToast('Could not open Rich Results Test', 'error'); }
+      }
+    });
+  });
+  bindReportTool(analyzeLinksButton, 'scripts/analyzeLinks.js', (data, container) => {
+    renderLinkAnalysis(data, container, {
+      copy: copyToClipboard,
+      notify: showToast,
+      open: async url => {
+        try { await chrome.tabs.create({ url }); }
+        catch { showToast('Could not open link', 'error'); }
+      }
+    });
+  });
 
   if (metaTagsButton) {
     metaTagsButton.addEventListener("click", async () => {
@@ -339,6 +381,7 @@ async function loadSummary() {
   const content = document.getElementById("summaryContent");
   if (!content) return;
 
+  lastSummaryData = null;
   content.innerHTML = '<div class="summary-loading"><span class="spinner"></span><span>Analyzing page...</span></div>';
 
   try {
@@ -374,11 +417,11 @@ function renderSummary(data, container) {
   const grid = document.createElement('div');
   grid.className = 'summary-grid';
 
-  // Indexable
+  // DOM meta directives only; this is not an indexing verdict.
   addSummaryRow(grid, {
     status: data.robotsMeta.blocked ? 'error' : 'success',
-    label: 'Indexable',
-    value: data.robotsMeta.blocked ? 'Blocked (noindex)' : 'Allowed'
+    label: 'Meta robots',
+    value: data.robotsMeta.blocked ? 'Noindex' : 'No noindex found'
   });
 
   // Title — show text
@@ -393,7 +436,7 @@ function renderSummary(data, container) {
   }
 
   // Canonical — with clickable URL
-  if (data.canonical.exists) {
+  if (data.canonical.exists && data.canonical.href) {
     const row = addSummaryRow(grid, {
       status: data.canonical.isSelf ? 'success' : 'warning',
       label: 'Canonical',
@@ -466,14 +509,14 @@ function renderSummary(data, container) {
 function addSummaryRow(parent, { status, label, value }) {
   const rowEl = document.createElement('div');
   rowEl.className = 'summary-row';
-  rowEl.innerHTML = `<span class="summary-dot summary-dot-${status}"></span><span class="summary-label">${label}</span><span class="summary-value">${value}</span>`;
+  appendTextSpans(rowEl, [[`summary-dot summary-dot-${status}`, ''], ['summary-label', label], ['summary-value', value]]);
   parent.appendChild(rowEl);
   return rowEl;
 }
 
 function formatSummaryText(data) {
   const lines = [];
-  lines.push(`Indexable: ${data.robotsMeta.blocked ? 'Blocked (noindex)' : 'Allowed'}`);
+  lines.push(`Meta robots: ${data.robotsMeta.blocked ? 'Noindex' : 'No noindex found'} (DOM only)`);
   lines.push(`Title: ${data.title.text || 'Missing'}`);
   if (data.canonical.exists) {
     lines.push(`Canonical: ${data.canonical.isSelf ? 'Self-referencing' : 'Different URL'} (${data.canonical.href})`);
@@ -516,7 +559,7 @@ function displayIndexabilityReport(checks) {
     const item = document.createElement("li");
     item.className = `indexability-item indexability-${check.type}`;
     const icon = check.type === 'pass' ? '\u2713' : check.type === 'fail' ? '\u2716' : '\u26A0';
-    item.innerHTML = `<span class="indexability-icon">${icon}</span><span class="indexability-label">${check.label}</span><span class="indexability-msg">${check.message}</span>`;
+    appendTextSpans(item, [['indexability-icon', icon], ['indexability-label', check.label], ['indexability-msg', check.message]]);
     list.appendChild(item);
   });
 
@@ -536,12 +579,15 @@ function displayIndexabilityReport(checks) {
   wrapper.appendChild(copyBtn);
 
   reportContainer.appendChild(wrapper);
+  reportContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const hasFailures = checks.some(c => c.type === 'fail');
   if (hasFailures) {
     showToast('Indexability issues found', 'warning');
+  } else if (checks.some(c => c.type === 'warning')) {
+    showToast('Review warnings; some checks are inconclusive', 'warning');
   } else {
-    showToast('Page appears indexable', 'success');
+    showToast('No blocking directives found in these checks', 'success');
   }
 }
 
@@ -606,6 +652,7 @@ function displayMetaTagsReport(data) {
   wrapper.appendChild(copyBtn);
 
   reportContainer.appendChild(wrapper);
+  reportContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function addMetaGroup(parent, title, text) {
@@ -637,39 +684,42 @@ function addMetaGroupTable(parent, title, tags) {
   tags.forEach(tag => {
     const row = document.createElement('div');
     row.className = 'meta-row';
-    row.innerHTML = `<span class="meta-key">${tag.key}</span><span class="meta-val">${tag.value}</span>`;
+    appendTextSpans(row, [['meta-key', tag.key], ['meta-val', tag.value]]);
     group.appendChild(row);
   });
 
   parent.appendChild(group);
 }
 
-function displayBrokenLinksReport(brokenLinks) {
-  const reportContainer = document.getElementById("reportContainer");
-  if (!reportContainer) return;
-
-  reportContainer.innerHTML = "";
-
-  if (brokenLinks.length === 0) {
-    showToast("No broken links found", "success");
-    return;
+function appendTextSpans(parent, entries) {
+  for (const [className, text] of entries) {
+    const span = document.createElement('span');
+    span.className = className;
+    span.textContent = text;
+    parent.appendChild(span);
   }
+}
 
-  const reportHeader = document.createElement("h3");
-  reportHeader.innerText = "Broken Links Report";
-
-  const reportList = document.createElement("ul");
-  reportList.classList.add("broken-links-list");
-
-  brokenLinks.forEach(link => {
-    const listItem = document.createElement("li");
-    listItem.innerText = `${link.url} [${link.status}]`;
-    reportList.appendChild(listItem);
-  });
-
-  reportContainer.appendChild(reportHeader);
-  reportContainer.appendChild(reportList);
-  showToast(`Found ${brokenLinks.length} broken link(s)`, "warning");
+function displayBrokenLinksReport(results) {
+  const container = document.getElementById('reportContainer');
+  container.replaceChildren();
+  const broken = results.filter(r => r.state === 'broken');
+  const unknown = results.filter(r => r.state === 'unknown');
+  const header = document.createElement('h3');
+  header.textContent = 'Link check';
+  const summary = document.createElement('p');
+  summary.className = 'report-note';
+  summary.textContent = `${results.length} URLs · ${results.filter(r => r.state === 'ok').length} OK · ${broken.length} broken · ${unknown.length} unverified`;
+  const list = document.createElement('ul');
+  list.className = 'broken-links-list';
+  for (const result of [...broken, ...unknown]) {
+    const item = document.createElement('li');
+    item.className = result.state;
+    item.textContent = `${result.url} [${result.status}]`;
+    list.appendChild(item);
+  }
+  container.append(header, summary, list);
+  container.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function copyToClipboard(text) {
@@ -683,8 +733,9 @@ async function copyToClipboard(text) {
     textarea.style.opacity = '0';
     document.body.appendChild(textarea);
     textarea.select();
-    document.execCommand('copy');
+    const copied = document.execCommand('copy');
     document.body.removeChild(textarea);
+    if (!copied) throw new Error('Could not copy to clipboard');
   }
 }
 
@@ -724,6 +775,30 @@ function initKeyboardShortcuts() {
           document.getElementById('themeToggle')?.click();
           break;
       }
+    }
+  });
+}
+
+
+function bindReportTool(button, file, render) {
+  if (!button) return;
+  button.addEventListener('click', async () => {
+    showLoading(button);
+    try {
+      const tab = await getActiveTab();
+      if (!tab) return;
+      if (isRestrictedUrl(tab.url)) { showToast('Not available on this page', 'warning'); return; }
+      const result = await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [file] });
+      const data = result?.[0]?.result;
+      if (!data) throw new Error('No report data');
+      const container = document.getElementById('reportContainer');
+      render(data, container);
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (error) {
+      console.error('Report error:', error);
+      showToast('Could not analyze this page', 'error');
+    } finally {
+      hideLoading(button);
     }
   });
 }

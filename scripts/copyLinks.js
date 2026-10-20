@@ -1,5 +1,5 @@
 (function () {
-  const links = document.querySelectorAll('a[href^="http"]');
+  const links = document.querySelectorAll('a[href]');
   const hostname = location.hostname;
   const internal = new Set();
   const external = new Set();
@@ -7,6 +7,7 @@
   links.forEach(link => {
     try {
       const url = new URL(link.href);
+      if (!['http:', 'https:'].includes(url.protocol)) return;
       if (url.hostname === hostname || url.hostname === 'www.' + hostname || hostname === 'www.' + url.hostname) {
         internal.add(url.pathname + url.search);
       } else {

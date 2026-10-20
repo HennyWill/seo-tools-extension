@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "SEO Tools",
-  "version": "1.2.0",
-  "description": "Modern SEO toolkit with indexability check, schema validation, link analysis. Integrates Google Search Console, Ahrefs, Archive.org.",
+  "name": "SEO Tools: On-Page SEO & Link Analyzer",
+  "version": "1.4.1",
+  "description": "Check meta tags, robots.txt, canonical URLs, JSON-LD and links. Open Search Console, Ahrefs and Google Rich Results in a click.",
   "author": "HennyWill",
   "permissions": ["activeTab", "scripting"],
   "action": {

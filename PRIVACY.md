@@ -1,6 +1,6 @@
 # Privacy Policy for SEO Tools Chrome Extension
 
-**Last Updated: December 2025**
+**Last Updated: October 2026**
 
 ## Overview
 
@@ -10,17 +10,18 @@ SEO Tools is a Chrome extension developed by HennyWill. We are committed to prot
 
 **We do not collect any personal data.**
 
-SEO Tools operates entirely locally in your browser. The extension:
+SEO Tools analyzes page content in your browser. The extension:
 
 - Does NOT collect any personal information
 - Does NOT track your browsing activity
-- Does NOT send any data to external servers
+- Makes requests to the current site for robots.txt, response headers, and same-origin link checks
+- Sends the current page URL to a selected third-party service only when you use its button
 - Does NOT use analytics or tracking tools
 - Does NOT store any data outside your browser
 
 ## Data Storage
 
-The only data stored by this extension is your theme preference (light/dark mode), which is saved locally in your browser using localStorage. This data:
+The extension stores your theme preference and Search Console resource overrides per hostname locally using localStorage. This data:
 
 - Never leaves your device
 - Is not accessible to us or any third party
@@ -60,4 +61,4 @@ If you have any questions about this privacy policy or the extension, you can:
 
 ## Summary
 
-**SEO Tools does not collect, store, or transmit any of your personal data. Your privacy is fully protected.**
+**No analytics or developer-operated data collection. Page URLs are shared with the third-party tools you choose to open.**

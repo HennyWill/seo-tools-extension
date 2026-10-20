@@ -5,9 +5,7 @@
     const ruleBody = endsWithDollar ? rule.slice(0, -1) : rule;
     let pattern = ruleBody.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
     pattern = pattern.replace(/\*/g, '.*');
-    if (!endsWithDollar) {
-      pattern += '.*';
-    }
+    pattern += endsWithDollar ? '$' : '.*';
     try {
       return new RegExp('^' + pattern).test(url);
     } catch (e) {
@@ -44,9 +42,6 @@
     try {
       const url = new URL(href, baseUrl);
       let normalized = url.origin + url.pathname;
-      if (normalized.endsWith('/') && url.pathname !== '/') {
-        normalized = normalized.slice(0, -1);
-      }
       if (url.search) normalized += url.search;
       return normalized;
     } catch {
@@ -59,10 +54,10 @@
     const url = location.pathname + location.search;
 
     // 1. Fetch and parse robots.txt
-    const robotsUrl = `${location.protocol}//${location.hostname}/robots.txt`;
+    const robotsUrl = new URL('/robots.txt', location.href).href;
     let robotsText = '';
     try {
-      const response = await fetch(robotsUrl);
+      const response = await fetch(robotsUrl, { signal: AbortSignal.timeout(10000) });
       if (!response.ok) {
         checks.push({ type: 'warning', label: 'robots.txt', message: `robots.txt returned status ${response.status}` });
       } else {
@@ -74,37 +69,41 @@
 
     if (robotsText) {
       // Remove comments but preserve case of paths
-      const cleanedText = robotsText.replace(/#.*/g, '').replace(/\r?\n/g, '\n').replace(/:\s+/g, ': ');
-
-      const userAgentBlocks = cleanedText.split(/user-agent\s*:/i);
-
-      // Parse wildcard (*) block
-      const starBlock = userAgentBlocks.find(block => block.trim().toLowerCase().startsWith('*')) || '';
-      const starResult = parseRobotsBlock(starBlock, url);
-
-      // Parse googlebot-specific block
-      const googlebotBlock = userAgentBlocks.find(block => block.trim().toLowerCase().startsWith('googlebot')) || '';
-      const googlebotResult = parseRobotsBlock(googlebotBlock, url);
-
-      // Googlebot-specific rules take precedence
-      const effectiveResult = googlebotResult.rule !== null ? googlebotResult : starResult;
+      const groups = [];
+      let group = null;
+      for (const raw of robotsText.split(/\r?\n/)) {
+        const line = raw.replace(/#.*/, '').trim();
+        const match = line.match(/^([\w-]+)\s*:\s*(.*)$/);
+        if (!match) continue;
+        const field = match[1].toLowerCase(), value = match[2].trim();
+        if (field === 'user-agent') {
+          if (!group || group.hasRules) {
+            group = { agents: [], rules: [], hasRules: false };
+            groups.push(group);
+          }
+          group.agents.push(value.toLowerCase());
+        } else if (group && (field === 'allow' || field === 'disallow')) {
+          group.hasRules = true;
+          group.rules.push(`${field}: ${value}`);
+        }
+      }
+      const specific = groups.filter(g => g.agents.includes('googlebot'));
+      const selected = specific.length ? specific : groups.filter(g => g.agents.includes('*'));
+      const effectiveResult = parseRobotsBlock(selected.flatMap(g => g.rules).join('\n'), url);
 
       if (effectiveResult.rule !== null) {
         const allowed = effectiveResult.type === 'allow';
         const ruleLabel = `${effectiveResult.type}: ${effectiveResult.rule}`;
         if (allowed) {
-          checks.push({ type: 'pass', label: 'robots.txt', message: `Allowed for indexing (rule: ${ruleLabel})` });
+          checks.push({ type: 'pass', label: 'robots.txt', message: `Crawling allowed (rule: ${ruleLabel})` });
         } else {
           checks.push({ type: 'fail', label: 'robots.txt', message: `Blocked by rule: ${ruleLabel}` });
         }
       } else {
-        checks.push({ type: 'pass', label: 'robots.txt', message: 'Allowed for indexing (no matching rules)' });
+        checks.push({ type: 'pass', label: 'robots.txt', message: 'Crawling allowed (no matching rules)' });
       }
 
-      // Warn if googlebot differs from wildcard
-      if (googlebotResult.rule !== null && starResult.rule !== null && googlebotResult.type !== starResult.type) {
-        checks.push({ type: 'warning', label: 'robots.txt', message: `Note: user-agent: * is ${starResult.type} but googlebot is ${googlebotResult.type}` });
-      }
+
     }
 
     // 2. Check meta robots tags
@@ -115,7 +114,7 @@
       const name = meta.getAttribute('name');
       if (name && ['robots', 'googlebot'].includes(name.toLowerCase())) {
         const content = meta.getAttribute('content')?.toLowerCase();
-        if (content?.includes('noindex') || content?.includes('none')) {
+        if (content?.split(/[\s,]+/).some(token => ['noindex', 'none'].includes(token))) {
           checks.push({ type: 'fail', label: `meta ${name}`, message: `Blocked by <meta name="${name}" content="${meta.getAttribute('content')}">` });
           metaTagBlocked = true;
         }
@@ -128,11 +127,21 @@
 
     // 3. Check X-Robots-Tag HTTP header
     try {
-      const headResponse = await fetch(location.href, { method: 'HEAD' });
+      const headResponse = await fetch(location.href, { method: 'HEAD', signal: AbortSignal.timeout(10000) });
+      if (!headResponse.ok) throw new Error(`HTTP ${headResponse.status}`);
       const xRobotsTag = headResponse.headers.get('x-robots-tag');
       if (xRobotsTag) {
-        const lower = xRobotsTag.toLowerCase();
-        if (lower.includes('noindex') || lower.includes('none')) {
+        let agent = null;
+        const directives = [];
+        for (let part of xRobotsTag.toLowerCase().split(',')) {
+          part = part.trim();
+          const scoped = part.match(/^([a-z][a-z0-9_-]*):\s*(.*)$/);
+          if (scoped && !['unavailable_after', 'max-snippet', 'max-video-preview', 'max-image-preview'].includes(scoped[1])) {
+            agent = scoped[1]; part = scoped[2];
+          }
+          if (!agent || agent === 'googlebot') directives.push(...part.split(/\s+/));
+        }
+        if (directives.some(token => ['noindex', 'none'].includes(token))) {
           checks.push({ type: 'fail', label: 'X-Robots-Tag', message: `Blocked by HTTP header: X-Robots-Tag: ${xRobotsTag}` });
         } else {
           checks.push({ type: 'pass', label: 'X-Robots-Tag', message: `X-Robots-Tag: ${xRobotsTag} (not blocking)` });
@@ -150,17 +159,17 @@
 
     for (let link of links) {
       const rel = link.getAttribute('rel');
-      if (rel && rel.toLowerCase() === 'canonical') {
+      if (rel && rel.toLowerCase().split(/\s+/).includes('canonical')) {
         const href = link.getAttribute('href');
         if (href) {
-          const normalizedCanonical = normalizeUrl(href, location.href);
+          const normalizedCanonical = normalizeUrl(href, document.baseURI);
           const normalizedCurrent = normalizeUrl(location.href);
           canonicalFound = true;
 
           if (normalizedCanonical === normalizedCurrent) {
-            checks.push({ type: 'pass', label: 'Canonical', message: `Self-referencing canonical: ${decodeURI(href)}` });
+            checks.push({ type: 'pass', label: 'Canonical', message: `Self-referencing canonical: ${href}` });
           } else {
-            checks.push({ type: 'fail', label: 'Canonical', message: `Canonical URL differs: ${decodeURI(href)}` });
+            checks.push({ type: 'warning', label: 'Canonical', message: `Canonical URL differs: ${href}` });
           }
         }
       }

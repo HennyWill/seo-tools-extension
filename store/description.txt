@@ -1,0 +1,34 @@
+SEO Tools puts on-page SEO checks and your everyday SEO services in one compact Chrome extension. Inspect meta tags, canonical URLs, robots directives, JSON-LD and page links without switching between multiple tools.
+
+QUICK ACCESS TO YOUR SEO WORKFLOW
+Open Google Search Console, Google Search and Google Rich Results Test directly below the page overview. Ahrefs Site Explorer and Backlinks are one row away. Search Console supports both Domain and URL-prefix properties, remembers your choice per site, and opens the performance report filtered to the current page.
+
+ON-PAGE SEO CHECKS
+• Page overview: page title, meta robots directives, canonical URL and hreflang links.
+• Indexability report: inspect robots.txt rules for Googlebot, meta robots, X-Robots-Tag response headers and canonical signals.
+• Meta tag inspector: title and description character counts, Open Graph, Twitter Cards and other metadata.
+• Heading extraction: copy H1–H6 headings with their hierarchy.
+
+LINK ANALYSIS
+See every HTTP(S) link occurrence with its URL, anchor text, internal/external classification and rel attributes, including nofollow, sponsored and ugc. Search by URL or anchor, combine filters, find empty anchors and copy the filtered table as TSV for a spreadsheet.
+
+Toggle link highlighting without overwriting the page's original inline styles. The broken-link checker checks same-origin links with bounded concurrency and timeouts. External links, network failures and inconclusive HTTP responses are clearly marked unverified; HTTP 404 and 410 responses are marked broken.
+
+STRUCTURED DATA AND JSON-LD
+Inspect JSON-LD blocks in the current page, including nested objects, arrays and @graph. View detected @type values, JSON syntax errors and the original source. Copy individual blocks, or use the separate Google Rich Results button to open Google's external testing service.
+
+The local JSON-LD inspector checks JSON syntax; it does not validate all Schema.org requirements or guarantee rich-result eligibility. The page overview reports observed directives, not proof that Google has indexed a page.
+
+BUILT FOR DAILY USE
+• Clear light and dark themes with system fonts.
+• Copy page summaries, metadata, headings and audit reports.
+• Quick links to Ahrefs and the Wayback Machine.
+• No sign-up required for local checks. External services may require an account or subscription.
+• Minimal permissions: activeTab and scripting. No analytics or developer-operated data collection.
+
+Analysis runs in your browser. Audit features make requests to the current site. When you open an external service, the current page URL is passed to that service. Theme and Search Console preferences stay in this Chrome profile.
+
+WHAT'S NEW IN 1.4.1
+A clearer interface with Search Console, Google Search, Rich Results and Ahrefs at the top; a searchable link table with TSV export; local JSON-LD inspection; remembered Search Console resource choices; and fixes for robots.txt, canonical handling and relative links.
+
+Support and source: https://github.com/hennywill/seo-tools-extension

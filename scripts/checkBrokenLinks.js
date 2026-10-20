@@ -1,28 +1,27 @@
 (async function () {
-  const links = document.getElementsByTagName("a");
-  const urls = [...new Set(
-    Array.from(links)
-      .map(a => a.href)
-      .filter(href => href && href.startsWith('http'))
-  )];
-
-  const brokenLinks = [];
-
-  await Promise.all(
-    urls.map(url =>
-      fetch(url, { method: 'HEAD', mode: 'no-cors' })
-        .then(response => {
-          // In no-cors mode we get opaque responses (status 0) for cross-origin
-          // Only flag actually failed responses with real status codes
-          if (response.type !== 'opaque' && !response.ok) {
-            brokenLinks.push({ url, status: response.status });
-          }
-        })
-        .catch(() => {
-          brokenLinks.push({ url, status: 'Error' });
-        })
-    )
-  );
-
-  return brokenLinks;
+  const urls = [...new Set(Array.from(document.querySelectorAll('a[href]'), a => a.href)
+    .filter(href => /^https?:\/\//i.test(href)))];
+  const results = [];
+  let next = 0;
+  async function worker() {
+    while (next < urls.length) {
+      const url = urls[next++];
+      if (new URL(url).origin !== location.origin) {
+        results.push({ url, state: 'unknown', status: 'External URL — not checked (requires host access)' });
+        continue;
+      }
+      try {
+        let response = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(10000) });
+        if ([405, 501].includes(response.status)) {
+          response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+          if (response.body) await response.body.cancel();
+        }
+        results.push({ url, state: response.ok ? 'ok' : ([404, 410].includes(response.status) ? 'broken' : 'unknown'), status: response.status });
+      } catch {
+        results.push({ url, state: 'unknown', status: 'Network error or timeout' });
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(5, urls.length) }, worker));
+  return results.sort((a, b) => a.url.localeCompare(b.url));
 })();

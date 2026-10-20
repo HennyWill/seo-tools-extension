@@ -1,173 +1,82 @@
-# SEO Tools - Chrome Extension
+# SEO Tools
 
-**Version 1.0.0** | Modern SEO toolkit by HennyWill
+Version 1.4.1 · Chrome extension · Manifest V3
 
-A powerful and modern Chrome extension for SEO professionals and web developers. Quick access to analysis tools and popular SEO services with a beautiful, themeable interface.
+A compact toolkit for inspecting the current page and opening common SEO services.
 
----
+## Install or reload
 
-## ✨ Features
+1. Open `chrome://extensions` and enable Developer mode.
+2. Choose **Load unpacked** and select this folder.
+3. After updating files, click **Reload** on the extension card.
 
-### 🔍 Analysis Tools
-- **Check Indexability** - Verify robots.txt rules, meta tags, and canonical URLs
-- **Check Schema Markup** - Test structured data with Google Rich Results
-- **Copy All Headings** - Extract H1-H6 headings for content analysis
-- **Copy All Links** - Extract all external links from the page
-- **Highlight All Links** - Visually highlight all links on the page
+## Tools
 
-### 🌐 External Services Integration
-- **Google Search** - Find the current page in Google search results
-- **Google Search Console** - Open page analytics directly
-- **Ahrefs** - View site/page analysis
-- **Ahrefs Backlinks** - Access backlink report with pre-configured filters
-- **Archive.org** - Check page history on Wayback Machine
+- **Page overview:** title, DOM meta robots, canonical and hreflang. This does not confirm Google indexing.
+- **Check Indexability:** robots.txt rules for Googlebot, meta robots, X-Robots-Tag from a new HEAD request, and canonical. Warnings mean that a check is inconclusive or needs review. These browser requests may differ from Google's responses.
+- **Meta Tags Overview:** title, description, Open Graph, Twitter and other meta tags.
+- **View JSON-LD:** inspects JSON-LD in the current DOM, lists literal @type values from nested objects and @graph, and reports JSON syntax errors. This is not full Schema.org or rich-result eligibility validation. Includes source preview, copy and an external Rich Results Test button. Blocks over 250,000 characters are skipped with an explicit truncated preview.
+- **Analyze Links:** table of HTTP(S) link occurrences, anchor text (with labeled image-alt/aria-label/title fallbacks), internal/external scope and rel tokens. Search, scope/attribute filters, 50-row pages and filtered TSV copy. TSV cells neutralize spreadsheet formula prefixes. Internal means the same hostname with a www alias; other subdomains are external. Page-level nofollow directives are not incorporated.
+- **Google Rich Results:** opens the current URL directly in Google Rich Results Test without running the local inspector.
+- **Link check:** same-origin HTTP/HTTPS links, five concurrent workers, ten-second timeout per request. HEAD 405/501 falls back to GET. HTTP 404/410 are broken; external URLs, other HTTP errors, timeouts and network errors are unverified. External status checks require additional host access and are not implemented.
+- **Extract:** copy headings or unique internal/external links, including relative links.
+- **Highlight:** toggle an injected stylesheet without replacing original inline link styles.
+- **Services:** Google Search, Search Console, Ahrefs, and Wayback Machine.
 
-### 🎨 Modern UI/UX
-- ✅ Light & Dark theme support
-- ✅ Auto theme detection (system preference)
-- ✅ Toast notifications instead of alerts
-- ✅ Loading indicators for async operations
-- ✅ SVG icons for all buttons
-- ✅ Smooth animations and transitions
-- ✅ Categorized tool sections
-- ✅ Glassmorphism effects
-- ✅ Gradient accents
+## Search Console
 
-### ⌨️ Keyboard Shortcuts
-- `Ctrl+Shift+H` - Copy all headings
-- `Ctrl+Shift+L` - Highlight all links
-- `Ctrl+Shift+I` - Check indexability
-- `Ctrl+Shift+T` - Toggle theme
+By default, the button opens a Domain property: `sc-domain:example.com` (the initial `www.` is removed).
 
----
+Use **Open Search Console for** to choose **Domain** or **Website address**. Domain is the default. Your selection is saved per hostname. Existing custom resource overrides are preserved as a saved choice. The full page URL stays in the performance report filter. The extension does not access your Google account or automatically discover its resources.
 
-## 🚀 Installation
 
-### From Source
-1. Download or clone this repository
-2. Open Chrome and go to `chrome://extensions/`
-3. Enable "Developer mode" (top right)
-4. Click "Load unpacked"
-5. Select the extension folder
+## Appearance and shortcuts
 
-### From Chrome Web Store
-*(Coming soon)*
+Light and dark themes use system fonts; no remote fonts are loaded. The theme button saves the preference locally.
 
----
+Shortcuts apply while the popup is focused; browser-reserved combinations may take precedence:
 
-## 📖 Usage
+- Ctrl/Cmd + Shift + H: copy headings
+- Ctrl/Cmd + Shift + L: highlight links
+- Ctrl/Cmd + Shift + I: check indexability
+- Ctrl/Cmd + Shift + T: switch theme
 
-1. Click the extension icon in your browser toolbar
-2. Select any tool from the categorized sections
-3. Use keyboard shortcuts for quick access to common tools
-4. Toggle between light/dark themes with the moon icon
+## Permissions and privacy
 
----
+Only `activeTab` and `scripting` are requested. Analysis runs on demand. The extension stores the theme and Search Console overrides locally, makes audit requests to the current site, and passes the current URL to third-party services when their buttons are used. No analytics or developer-operated collection. See PRIVACY.md.
 
-## 🛠️ Technical Details
+## Development
 
-### Technologies
-- **Manifest V3** - Latest Chrome Extension API
-- **ES6+ JavaScript** - Modern async/await, modules
-- **CSS Variables** - Dynamic theming system
-- **Fetch API** - Modern HTTP requests
-- **SVG Icons** - Scalable vector graphics
-- **LocalStorage** - Theme preference persistence
+No build step or dependencies. Run regression checks with Node.js 22 or newer:
 
-### Architecture
-```
-/seo/
-├── manifest.json           # Extension configuration
-├── popup.html              # Main UI with SVG icons
-├── popup.css               # Modern styles with theme support
-├── popup.js                # Refactored ES6+ code
-├── popup/utils/
-│   ├── url.js             # URL utility functions
-│   └── ui.js              # Toast & loading utilities
-└── scripts/                # Content scripts
-    ├── checkIndexability.js
-    ├── copyHeadings.js
-    ├── copyLinks.js
-    ├── getLinkUrls.js
-    └── highlightLinks.js
+```sh
+node --test tests/regression.cjs
 ```
 
-### Code Improvements (v1.0)
-- ✅ Refactored from `var` to `const/let`
-- ✅ Replaced XMLHttpRequest with `fetch()`
-- ✅ Added comprehensive error handling
-- ✅ Implemented async/await throughout
-- ✅ Removed unused background.js
-- ✅ Created modular utility system
-- ✅ Added toast notification system
-- ✅ Implemented loading states
-- ✅ Added keyboard shortcuts
-- ✅ Created theme system
+Source: `popup.html`, `popup.css`, `popup.js`, shared utilities in `popup/utils/`, and injected scripts in `scripts/`.
 
----
+## Version 1.3.0
 
-## 🎨 Theme System
-
-The extension supports three theme modes:
-- **Light** - Clean, bright interface
-- **Dark** - Eye-friendly dark mode
-- **Auto** - Follows system preference (default)
-
-Themes use CSS variables for instant switching without page reload.
-
----
-
-## 🔒 Permissions
-
-This extension requires minimal permissions:
-- `activeTab` - Access the current tab's URL and DOM
-- `scripting` - Execute content scripts for analysis
-
-**No data collection. No tracking. Privacy-focused.**
-
----
-
-## 🤝 Support
-
-If you find this extension useful, consider supporting the developer:
-
-☕ [Buy me a coffee](https://www.buymeacoffee.com/hennywill)
-
----
-
-## 📝 Changelog
-
-### Version 1.0.0 (December 2025)
-- 🎨 Complete UI/UX redesign with modern interface
-- 🌓 Added dark theme support with auto-detection
-- ⌨️ Implemented keyboard shortcuts
-- 🔔 Replaced alerts with toast notifications
-- ⚡ Added loading indicators for async operations
-- 📂 Organized tools into categories
-- 🎯 Added SVG icons for all buttons
-- 💅 Implemented glassmorphism and gradient effects
-- ⚙️ Code refactoring: ES6+, async/await, fetch API
-- 🐛 Improved error handling throughout
-- 🗑️ Removed unused background.js
-- 📦 Updated to semantic versioning (1.0.0)
-
-### Version 0.8 (Previous)
-- Initial release with basic features
-
----
-
-## 📄 License
+- Compact grouped interface, neutral palette, accessible focus styles and reduced-motion support.
+- Configurable Search Console resources, including parent domains and URL-prefix properties.
+- Explicit DOM meta status instead of an unsupported indexing claim.
+- Robots.txt group selection, merged groups, end anchors and non-standard ports fixed.
+- Canonical and hreflang resolve against the page base; trailing slashes remain significant.
+- Page values render as text; link highlighting preserves existing inline styles.
+- Link checker reports unverified URLs honestly and bounds concurrency and request duration.
 
 Copyright © 2026 HennyWill. All rights reserved.
 
----
 
-## 🐛 Bug Reports & Feature Requests
+## Version 1.4.0
 
-Found a bug or have a feature request? Feel free to:
-1. Open an issue on GitHub
-2. Contact via [buymeacoffee.com/hennywill](https://www.buymeacoffee.com/hennywill)
+- Added local JSON-LD inspection and link analysis with filters and TSV copy.
+- Kept the Google Rich Results Test as an explicit external action inside the structured data report.
+- No additional permissions or external dependencies.
 
----
 
-**Made with ❤️ by HennyWill**
+## Version 1.4.1
+
+- Stronger light-theme contrast, distinct button surfaces and a dark green header.
+- Replaced raw Search Console resource ID input with a remembered resource selector; Domain remains the default.
+- Restored a direct Google Rich Results button alongside local JSON-LD inspection.
